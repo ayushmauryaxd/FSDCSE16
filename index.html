@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Task Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink-navy: #1b2430;
+    --ink-navy-2: #232f3f;
+    --parchment: #f2ecdd;
+    --parchment-dim: #e8e0cc;
+    --stamp-red: #b23a2e;
+    --stamp-green: #4c7a5e;
+    --gold: #c9a24b;
+    --line: rgba(242,236,221,0.14);
+    --shadow: rgba(0,0,0,0.35);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 15% 10%, rgba(201,162,75,0.08), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(76,122,94,0.08), transparent 45%),
+      var(--ink-navy);
+    font-family:'IBM Plex Sans', sans-serif;
+    color: var(--parchment);
+    padding: 48px 20px 80px;
+    display:flex;
+    justify-content:center;
+  }
+
+  .board{
+    width:100%;
+    max-width: 640px;
+  }
+
+  /* header / masthead */
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom: 2px solid var(--parchment);
+    padding-bottom: 14px;
+    margin-bottom: 28px;
+  }
+  .masthead h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size: 2.4rem;
+    letter-spacing: 0.5px;
+    margin:0;
+  }
+  .masthead .kicker{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.7rem;
+    letter-spacing: 3px;
+    text-transform:uppercase;
+    color: var(--gold);
+    display:block;
+    margin-bottom:6px;
+  }
+  .masthead .tally{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.85rem;
+    text-align:right;
+    color: var(--parchment-dim);
+    line-height:1.5;
+  }
+  .masthead .tally strong{ color: var(--parchment); font-size:1.1rem; }
+
+  /* stat cards: total / completed / pending */
+  .stats{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+  .stat{
+    background: var(--ink-navy-2);
+    border: 1px solid rgba(242,236,221,0.12);
+    border-radius: 4px;
+    padding: 14px 16px;
+    text-align:center;
+  }
+  .stat .num{
+    font-family:'Fraunces', serif;
+    font-size: 1.9rem;
+    font-weight:600;
+    line-height:1;
+    display:block;
+  }
+  .stat.total .num{ color: var(--parchment); }
+  .stat.completed .num{ color: var(--stamp-green); }
+  .stat.pending .num{ color: var(--gold); }
+  .stat .label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(242,236,221,0.45);
+    margin-top: 4px;
+    display:block;
+  }
+
+  /* add-task entry, styled like inserting a new card into the ledger */
+  .entry{
+    display:flex;
+    gap:10px;
+    margin-bottom: 30px;
+  }
+  .entry input[type="text"]{
+    flex:1;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px dashed rgba(242,236,221,0.4);
+    color: var(--parchment);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size: 1rem;
+    padding: 10px 4px;
+    outline:none;
+    transition: border-color 0.2s ease;
+  }
+  .entry input[type="text"]::placeholder{ color: rgba(242,236,221,0.35); }
+  .entry input[type="text"]:focus{ border-color: var(--gold); }
+
+  .priority-select{
+    display:flex;
+    border: 1px solid rgba(242,236,221,0.25);
+    border-radius: 3px;
+    overflow:hidden;
+  }
+  .priority-select button{
+    background:transparent;
+    border:none;
+    color: rgba(242,236,221,0.55);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing:1px;
+    padding: 0 10px;
+    cursor:pointer;
+    border-right: 1px solid rgba(242,236,221,0.15);
+  }
+  .priority-select button:last-child{ border-right:none; }
+  .priority-select button.active[data-p="low"]{ background: var(--stamp-green); color: var(--ink-navy); }
+  .priority-select button.active[data-p="normal"]{ background: var(--gold); color: var(--ink-navy); }
+  .priority-select button.active[data-p="urgent"]{ background: var(--stamp-red); color: var(--parchment); }
+
+  .add-btn{
+    background: var(--parchment);
+    color: var(--ink-navy);
+    border: none;
+    border-radius: 3px;
+    padding: 0 18px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor:pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .add-btn:hover{ background: var(--gold); }
+  .add-btn:active{ transform: scale(0.96); }
+
+  /* filters */
+  .filters{
+    display:flex;
+    gap: 4px;
+    margin-bottom: 18px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .filters button{
+    background:none;
+    border:none;
+    color: rgba(242,236,221,0.4);
+    padding: 6px 10px;
+    cursor:pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .filters button.active{
+    color: var(--parchment);
+    border-bottom-color: var(--gold);
+  }
+
+  /* task list */
+  .list{
+    display:flex;
+    flex-direction:column;
+    gap: 12px;
+  }
+
+  .card{
+    position:relative;
+    background: var(--parchment);
+    color: var(--ink-navy);
+    border-radius: 2px;
+    padding: 16px 18px;
+    display:flex;
+    align-items:flex-start;
+    gap: 14px;
+    box-shadow: 0 6px 14px var(--shadow);
+    overflow:hidden;
+    animation: cardIn 0.28s ease;
+  }
+  @keyframes cardIn{
+    from{ opacity:0; transform: translateY(6px); }
+    to{ opacity:1; transform: translateY(0); }
+  }
+
+  .card::before{
+    /* perforated edge */
+    content:"";
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width: 10px;
+    background-image: radial-gradient(circle, var(--ink-navy) 2.2px, transparent 2.3px);
+    background-size: 10px 14px;
+    background-position: 0 4px;
+    opacity: 0.5;
+  }
+
+  .checkbox{
+    flex-shrink:0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--ink-navy);
+    margin-left: 8px;
+    margin-top: 2px;
+    cursor:pointer;
+    position:relative;
+    background:none;
+    padding:0;
+  }
+  .checkbox::after{
+    content:"";
+    position:absolute;
+    inset: 3px;
+    border-radius:50%;
+    background: var(--stamp-green);
+    transform: scale(0);
+    transition: transform 0.15s ease;
+  }
+  .card.done .checkbox::after{ transform: scale(1); }
+
+  .card .body{ flex:1; min-width:0; margin-left: 4px;}
+  .card .task-text{
+    font-family:'Fraunces', serif;
+    font-size: 1.05rem;
+    line-height:1.4;
+    word-break: break-word;
+  }
+  .card.done .task-text{
+    text-decoration: line-through;
+    opacity: 0.5;
+  }
+  .card .meta{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.5px;
+    color: rgba(27,36,48,0.5);
+    margin-top: 6px;
+    display:flex;
+    gap: 10px;
+    align-items:center;
+  }
+  .tag{
+    padding: 1px 7px;
+    border-radius: 2px;
+    text-transform:uppercase;
+  }
+  .tag.low{ background: rgba(76,122,94,0.18); color: var(--stamp-green); }
+  .tag.normal{ background: rgba(201,162,75,0.22); color: #8a6a1f; }
+  .tag.urgent{ background: rgba(178,58,46,0.18); color: var(--stamp-red); }
+
+  .delete-btn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    color: rgba(27,36,48,0.35);
+    font-size: 1.1rem;
+    line-height:1;
+    padding: 4px;
+    flex-shrink:0;
+    transition: color 0.15s ease;
+  }
+  .delete-btn:hover{ color: var(--stamp-red); }
+
+  /* stamped DONE mark */
+  .stamp{
+    position:absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-14deg) scale(0);
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    color: var(--stamp-red);
+    border: 2px solid var(--stamp-red);
+    border-radius: 4px;
+    padding: 3px 10px;
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    pointer-events:none;
+  }
+  .card.done .stamp{
+    transform: translateY(-50%) rotate(-14deg) scale(1);
+    opacity: 0.85;
+  }
+
+  /* completion log table */
+  .log-section{
+    margin-top: 40px;
+  }
+  .log-section h2{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size: 1.2rem;
+    margin: 0 0 4px;
+  }
+  .log-section .sub{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(242,236,221,0.4);
+    margin-bottom: 14px;
+    display:block;
+  }
+  table.log{
+    width:100%;
+    border-collapse: collapse;
+    background: var(--parchment);
+    border-radius: 3px;
+    overflow:hidden;
+    box-shadow: 0 6px 14px var(--shadow);
+  }
+  table.log thead th{
+    text-align:left;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(27,36,48,0.55);
+    background: var(--parchment-dim);
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(27,36,48,0.1);
+  }
+  table.log tbody td{
+    padding: 11px 16px;
+    color: var(--ink-navy);
+    font-size: 0.92rem;
+    border-bottom: 1px solid rgba(27,36,48,0.08);
+  }
+  table.log tbody tr:last-child td{ border-bottom:none; }
+  table.log tbody td.date-cell{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--stamp-green);
+    white-space: nowrap;
+  }
+  table.log tbody td.task-cell{ word-break: break-word; }
+  .log-empty{
+    padding: 20px 16px;
+    text-align:center;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: rgba(27,36,48,0.4);
+    background: var(--parchment);
+    border-radius: 3px;
+  }
+
+  .empty{
+    text-align:center;
+    padding: 50px 20px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: rgba(242,236,221,0.4);
+    border: 1px dashed rgba(242,236,221,0.2);
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .card, .checkbox::after, .stamp{ animation:none !important; transition:none !important; }
+  }
+
+  @media (max-width: 480px){
+    .masthead h1{ font-size: 1.8rem; }
+    .entry{ flex-wrap: wrap; }
+    .priority-select{ order: 3; width:100%; }
+    .add-btn{ padding: 10px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="board">
+
+  <div class="masthead">
+    <div>
+      <span class="kicker">Daily Ledger</span>
+      <h1>To‑Do</h1>
+    </div>
+    <div class="tally">
+      <strong id="totalCountSmall">0</strong> entries logged
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat total">
+      <span class="num" id="totalCount">0</span>
+      <span class="label">Total Task</span>
+    </div>
+    <div class="stat completed">
+      <span class="num" id="completedCount">0</span>
+      <span class="label">Completed</span>
+    </div>
+    <div class="stat pending">
+      <span class="num" id="pendingCount">0</span>
+      <span class="label">Pending</span>
+    </div>
+  </div>
+
+  <div class="entry">
+    <input type="text" id="taskInput" placeholder="Enter your task…" maxlength="140">
+    <div class="priority-select" id="prioritySelect">
+      <button data-p="low">Low</button>
+      <button data-p="normal" class="active">Normal</button>
+      <button data-p="urgent">Urgent</button>
+    </div>
+    <button class="add-btn" id="addBtn">Add Task</button>
+  </div>
+
+  <div class="filters" id="filters">
+    <button class="active" data-f="all">All</button>
+    <button data-f="done">Completed</button>
+    <button data-f="active">Pending</button>
+  </div>
+
+  <div class="list" id="list"></div>
+
+  <div class="log-section">
+    <h2>Completion Log</h2>
+    <span class="sub">Task &amp; the date it was marked complete</span>
+    <div id="logWrap"></div>
+  </div>
+</div>
+
+<script>
+  let tasks = [];
+  let idCounter = 1;
+  let currentFilter = 'all';
+  let selectedPriority = 'normal';
+
+  const list = document.getElementById('list');
+  const input = document.getElementById('taskInput');
+  const addBtn = document.getElementById('addBtn');
+  const prioritySelect = document.getElementById('prioritySelect');
+  const filters = document.getElementById('filters');
+  const totalCount = document.getElementById('totalCount');
+  const completedCount = document.getElementById('completedCount');
+  const pendingCount = document.getElementById('pendingCount');
+  const totalCountSmall = document.getElementById('totalCountSmall');
+  const logWrap = document.getElementById('logWrap');
+
+  prioritySelect.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    selectedPriority = btn.dataset.p;
+    [...prioritySelect.children].forEach(b => b.classList.toggle('active', b === btn));
+  });
+
+  filters.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    currentFilter = btn.dataset.f;
+    [...filters.children].forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+
+  function addTask(){
+    const text = input.value.trim();
+    if(!text) return;
+    tasks.unshift({
+      id: idCounter++,
+      text,
+      
+      priority: selectedPriority,
+      done: false,
+      time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+      completedDate: null
+    });
+    input.value = '';
+    render();
+  }
+
+  addBtn.addEventListener('click', addTask);
+  input.addEventListener('keydown', (e) => { if(e.key === 'Enter') addTask(); });
+
+  function render(){
+    let visible = tasks;
+    if(currentFilter === 'active') visible = tasks.filter(t => !t.done);
+    if(currentFilter === 'done') visible = tasks.filter(t => t.done);
+
+    list.innerHTML = '';
+
+    if(visible.length === 0){
+      const msg = tasks.length === 0
+        ? 'The ledger is empty. File your first entry above.'
+        : 'Nothing here for this view.';
+      const div = document.createElement('div');
+      div.className = 'empty';
+      div.textContent = msg;
+      list.appendChild(div);
+    } else {
+      visible.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'card' + (t.done ? ' done' : '');
+
+        card.innerHTML = `
+          <button class="checkbox" aria-label="Toggle complete"></button>
+          <div class="body">
+            <div class="task-text"></div>
+            <div class="meta">
+              <span class="tag ${t.priority}">${t.priority}</span>
+              <span>${t.time}</span>
+            </div>
+          </div>
+          <button class="delete-btn" aria-label="Delete task">✕</button>
+          <div class="stamp">DONE</div>
+        `;
+        card.querySelector('.task-text').textContent = t.text;
+
+        card.querySelector('.checkbox').addEventListener('click', () => {
+          t.done = !t.done;
+          t.completedDate = t.done
+            ? new Date().toLocaleDateString([], {year:'numeric', month:'short', day:'numeric'})
+            : null;
+          render();
+        });
+        card.querySelector('.delete-btn').addEventListener('click', () => {
+          tasks = tasks.filter(x => x.id !== t.id);
+          render();
+        });
+
+        list.appendChild(card);
+      });
+    }
+
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.done).length;
+    const pending = total - completed;
+
+    totalCount.textContent = total;
+    completedCount.textContent = completed;
+    pendingCount.textContent = pending;
+    totalCountSmall.textContent = total;
+
+    renderLog();
+  }
+
+  function renderLog(){
+    const completedTasks = tasks.filter(t => t.done).sort((a, b) => b.id - a.id);
+
+    if(completedTasks.length === 0){
+      logWrap.innerHTML = '<div class="log-empty">No tasks completed yet.</div>';
+      return;
+    }
+
+    let rows = '';
+    completedTasks.forEach(t => {
+      rows += `<tr><td class="task-cell"></td><td class="date-cell"></td></tr>`;
+    });
+
+    logWrap.innerHTML = `
+      <table class="log">
+        <thead>
+          <tr><th>Task</th><th>Completed On</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    // fill text content safely (avoids HTML injection from task text)
+    const rowEls = logWrap.querySelectorAll('tbody tr');
+    rowEls.forEach((row, i) => {
+      row.children[0].textContent = completedTasks[i].text;
+      row.children[1].textContent = completedTasks[i].completedDate;
+    });
+  }
+
+  render();
+</script>
+</body>
+</html>
